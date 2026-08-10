@@ -28,6 +28,24 @@ struct PriceLevel
         dummy_head.next = &dummy_tail;
         dummy_tail.prev = &dummy_head;
     }
+
+    void add_order(Order* order) {
+        order->price_level = this;
+        Order* old_tail = dummy_tail.prev;
+        old_tail->next = order;
+        order->prev = old_tail;
+        order->next = &dummy_tail;
+        dummy_tail.prev = order;
+        ++order_count;
+        total_qty += order->qty_remaining;
+    }
+
+    void remove_order(Order* order) {
+        order->prev->next = order->next;
+        order->next->prev = order->prev;
+        --order_count;
+        total_qty -= order->qty_remaining;
+    }
 };
 
 class OrderBookTest;
@@ -51,6 +69,14 @@ class OrderBook
     FRIEND_TEST(MarketOrderTest, MarketOrderRestInBookAtExtremePrice);
     
 public:
+    static inline Side get_opposite_side(Side side) {
+        return static_cast<Side>(1 ^ static_cast<int>(side));
+    }
+    
+    static inline uint64_t make_combined_id(uint32_t client_id, uint32_t order_id) {
+        return (static_cast<uint64_t>(client_id) << 32) | order_id;
+    }
+
     explicit OrderBook(uint64_t symbol_id,
                        int64_t min_step,
                        int64_t price_offset,
@@ -107,8 +133,7 @@ private:
 
     void match(Order* taker, Side side, size_t price_idx);
 
-    // Linked list 操作
-    void insertOrderToLevel(PriceLevel* level, Order* order, Side side);
-    void removeOrderFromLevel(Order* order);
+    void checkAndRemoveEmptyLevel(PriceLevel* pl, Side side);
+    void unlinkAndDestroyOrder(Order* o, Side side);
 };
 }
